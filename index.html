@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini RPA — Painel do administrador</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --tx:#1b1f27; --mut:#6b7280; --bd:#e3e6eb; --pri:#2563eb; --pri-tx:#fff;
+    --ok:#16a34a; --okbg:#dcfce7; --warn:#b45309; --warnbg:#fef3c7; --bad:#dc2626; --badbg:#fee2e2; --off:#9ca3af; --hover:#f0f4ff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f1218; --card:#171b23; --tx:#e6e9ef; --mut:#9aa3b2; --bd:#262c38; --pri:#3b82f6; --pri-tx:#fff;
+      --ok:#4ade80; --okbg:#12301d; --warn:#fbbf24; --warnbg:#3a2c0b; --bad:#f87171; --badbg:#3b1616; --off:#6b7280; --hover:#1c2433; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  button,input,textarea{font:inherit;color:inherit}
+  button{border:1px solid var(--bd);background:var(--card);border-radius:8px;padding:7px 12px;cursor:pointer}
+  button:hover{background:var(--hover)}
+  button.primary{background:var(--pri);color:var(--pri-tx);border-color:var(--pri)}
+  button.danger{color:var(--bad);border-color:var(--bad)}
+  input,textarea{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;width:100%}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  header h1{font-size:18px;margin:0;flex:1}
+  .live{display:inline-flex;align-items:center;gap:6px;color:var(--mut);font-size:12px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--off);display:inline-block}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 3px var(--okbg)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+  .stat{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;cursor:pointer}
+  .stat b{display:block;font-size:26px;line-height:1.1}
+  .stat span{color:var(--mut);font-size:12px}
+  .stat.sel{outline:2px solid var(--pri)}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .bar input{max-width:340px}
+  .chip{border-radius:999px;padding:5px 12px;font-size:13px}
+  .chip.sel{background:var(--pri);color:var(--pri-tx);border-color:var(--pri)}
+  .tblbox{background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;min-width:900px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--bd);white-space:nowrap}
+  th{font-size:12px;color:var(--mut);font-weight:600;position:sticky;top:0;background:var(--card)}
+  tbody tr{cursor:pointer} tbody tr:hover{background:var(--hover)} tr:last-child td{border-bottom:0}
+  code{font:12px ui-monospace,Consolas,monospace}
+  .badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600}
+  .b-ok{background:var(--okbg);color:var(--ok)} .b-warn{background:var(--warnbg);color:var(--warn)}
+  .b-bad{background:var(--badbg);color:var(--bad)} .b-off{background:var(--bg);color:var(--mut);border:1px solid var(--bd)}
+  .empty{padding:32px;text-align:center;color:var(--mut)}
+  .login{max-width:360px;margin:12vh auto;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:22px}
+  .login h1{font-size:18px;margin:0 0 14px} .login label{display:block;margin:10px 0 4px;color:var(--mut);font-size:12px}
+  .err{color:var(--bad);margin-top:10px;font-size:13px}
+  dialog{border:1px solid var(--bd);border-radius:14px;background:var(--card);color:var(--tx);width:min(720px,94vw);padding:0}
+  dialog::backdrop{background:rgba(0,0,0,.45)}
+  dialog{max-height:92dvh;overflow-y:auto}
+  @media (max-width:600px){
+    button,select,input{min-height:44px}
+    dialog{width:96vw}
+    .tblbox{-webkit-overflow-scrolling:touch}
+  }
+  .dh{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)}
+  .dh h2{font-size:16px;margin:0;flex:1}
+  .db{padding:16px;display:grid;gap:14px}
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+  .kv div span{display:block;color:var(--mut);font-size:12px}
+  .df{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--bd)}
+  .sub{font-size:12px;color:var(--mut)}
+  .tabs{display:flex;gap:6px}
+  .tab{border-radius:999px;padding:6px 14px}
+  .tab.sel{background:var(--pri);color:var(--pri-tx);border-color:var(--pri)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+  .stat small{display:block;color:var(--mut);font-size:11px;margin-top:2px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-bottom:12px}
+  .panel{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;min-width:0}
+  .panel h3{font-size:14px;margin:0 0 2px} .panel .sub{margin:0 0 8px}
+  .panel svg{width:100%;height:auto;display:block}
+  .panel svg .grid{stroke:var(--bd);stroke-width:1} .panel svg .ax{fill:var(--mut);font-size:10px}
+  .c-pri{fill:var(--pri)} .c-soft{fill:var(--pri);opacity:.22} .c-ok{fill:var(--ok)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-bottom:6px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .stack{display:flex;height:22px;border-radius:7px;overflow:hidden;background:var(--bg);border:1px solid var(--bd)}
+  .stack span{display:block;height:100%}
+  .s-ok{background:var(--ok)} .s-warn{background:var(--warn)} .s-bad{background:var(--bad)} .s-off{background:var(--off)} .s-pri{background:var(--pri)}
+  .lg{display:grid;gap:5px;margin-top:10px;font-size:13px}
+  .lg div{display:flex;align-items:center;gap:8px} .lg b{margin-left:auto}
+  .lg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .vrow{display:grid;grid-template-columns:70px 1fr 34px;gap:8px;align-items:center;font-size:13px;margin:5px 0}
+  .vbar{height:10px;border-radius:5px;background:var(--pri)}
+  .mini{width:100%;border-collapse:collapse;min-width:0} .mini td{padding:7px 4px;white-space:nowrap}
+  .mini tr{cursor:pointer}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<section id="loginView" class="login" hidden>
+  <h1>Mini RPA · Administrador</h1>
+  <label for="em">E-mail</label><input id="em" type="email" autocomplete="username">
+  <label for="pw">Senha</label><input id="pw" type="password" autocomplete="current-password">
+  <div style="margin-top:14px"><button id="go" class="primary" style="width:100%">Entrar</button></div>
+  <div id="lerr" class="err"></div>
+</section>
+
+<div id="appView" class="wrap" hidden>
+  <header>
+    <h1>Mini RPA · Painel</h1>
+    <nav class="tabs"><button id="tDash" class="tab sel">Dashboard</button><button id="tCli" class="tab">Clientes</button></nav>
+    <span class="live"><i id="liveDot" class="dot"></i><span id="liveTxt">conectando…</span></span>
+    <span class="sub" id="who"></span>
+    <button id="reload">Atualizar</button>
+    <button id="out">Sair</button>
+  </header>
+
+  <div id="dashView">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="panel"><h3>Uso nos últimos 30 dias</h3><p class="sub">Quantos clientes abriram o painel e quantos gravaram/executaram em cada dia.</p>
+        <div class="legend"><span><i style="background:var(--pri);opacity:.25"></i>Abriram</span><span><i style="background:var(--pri)"></i>Usaram de fato</span></div><div id="chUse"></div></div>
+      <div class="panel"><h3>Novas instalações (30 dias)</h3><p class="sub">Primeiro sinal recebido de cada instalação.</p><div id="chNew"></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h3>Assinaturas</h3><p class="sub" id="subTot"></p><div id="chSubs"></div></div>
+      <div class="panel"><h3>Versões instaladas</h3><p class="sub">Quem ainda não atualizou.</p><div id="chVer"></div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h3>Vencem primeiro</h3><p class="sub">Próximas renovações.</p><div id="lsExp"></div></div>
+      <div class="panel"><h3>Assinam mas não usam</h3><p class="sub">Assinatura ativa e nenhum uso em 7 dias: risco de cancelamento.</p><div id="lsIdle"></div></div>
+    </div>
+  </div>
+
+  <div id="clientsView" hidden>
+  <div class="cards" id="cards"></div>
+
+  <div class="bar">
+    <input id="q" placeholder="Buscar por nome, ID ou anotação…">
+    <span id="chips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+  </div>
+
+  <div class="tblbox">
+    <table>
+      <thead><tr>
+        <th>Status</th><th>Cliente</th><th>ID</th><th>Assinatura</th><th>Uso</th>
+        <th>Último uso</th><th>Execuções</th><th>Risco</th><th>Sinal</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" class="empty" hidden>Nenhuma instalação encontrada.</div>
+  </div>
+  <p class="sub"><b>Aberto</b> = painel da extensão aberto (sinal nos últimos 150 s). <b>Em uso</b> = aberto e gravando/executando agora. <b>Último uso</b> = última vez que o cliente gravou ou executou algo. Só instalar ou abrir não conta como uso: quem nunca gravou nem executou aparece como <b>Nunca usou</b>. Risco de compartilhamento (sem IP): cada instalação recebe um código que muda a cada sinal. Se o perfil do Firefox for copiado, as duas cópias passam a divergir e o painel marca <b>médio</b> (1+ divergência nos últimos 7 dias) ou <b>alto</b> (3+). Isso <b>só avisa, nunca bloqueia</b>: uma divergência isolada pode ser um backup restaurado. Veja o detalhe e, se confirmar, revogue manualmente. Depois de resolver, use "Limpar alertas".</p>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <div class="dh"><h2 id="dTitle"></h2><button id="dClose">Fechar</button></div>
+  <div class="db" id="dBody"></div>
+  <div class="df" id="dFoot"></div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// ===== CONFIGURAÇÃO =====
+const SUPABASE_URL = 'https://rwevjelegzauprluyufd.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3ZXZqZWxlZ3phdXBybHV5dWZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5NjYxOTAsImV4cCI6MjEwODU0MjE5MH0.g24pKphdzuHmvPVywHQq_pgP3nFQllfVm3lMJntYdXc';
+// ========================
+
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let sb, rows = [], daily = [], filter = 'all', query = '', openId = null, timer = null, deb = null;
+
+function boot() {
+  if (SUPABASE_URL.includes('SEU-PROJETO') || SUPABASE_ANON_KEY.startsWith('COLE')) {
+    $('loginView').hidden = false;
+    $('lerr').textContent = 'Edite admin.html e preencha SUPABASE_URL e SUPABASE_ANON_KEY.';
+    $('go').disabled = true; return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.getSession().then(({ data }) => data.session ? start(data.session) : ($('loginView').hidden = false));
+}
+
+$('go').onclick = async () => {
+  $('lerr').textContent = '';
+  const { data, error } = await sb.auth.signInWithPassword({ email: $('em').value.trim(), password: $('pw').value });
+  if (error) return $('lerr').textContent = 'Falha no login: ' + error.message;
+  start(data.session);
+};
+$('pw').onkeydown = e => { if (e.key === 'Enter') $('go').click(); };
+$('out').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+$('reload').onclick = () => load();
+
+async function start(session) {
+  $('loginView').hidden = true; $('appView').hidden = false;
+  $('who').textContent = session.user.email;
+  const { data: adm } = await sb.rpc('is_admin');
+  if (!adm) { $('rows').innerHTML = ''; $('empty').hidden = false; $('empty').textContent = 'Este e-mail não está cadastrado na tabela "admins".'; return; }
+  await load();
+  const kick = () => { clearTimeout(deb); deb = setTimeout(load, 800); };
+  sb.channel('rt').on('postgres_changes', { event: '*', schema: 'public', table: 'installs' }, kick)
+    .subscribe(s => { $('liveDot').className = 'dot' + (s === 'SUBSCRIBED' ? ' on' : ''); $('liveTxt').textContent = s === 'SUBSCRIBED' ? 'ao vivo' : 'reconectando…'; });
+  clearInterval(timer); timer = setInterval(load, 15000);   // atualiza também quem ficou offline
+}
+
+async function load() {
+  const { data, error } = await sb.from('installs_admin').select('*').order('last_seen', { ascending: false });
+  if (error) { $('liveTxt').textContent = 'erro: ' + error.message; return; }
+  rows = data || [];
+  const since = new Date(Date.now() - 60 * 864e5);
+  const dres = await sb.from('daily_stats').select('*').gte('day', dkey(since)).order('day');
+  daily = dres.error ? [] : (dres.data || []);
+  render(); renderDash();
+  if (openId && $('dlg').open) showDetail(openId, true);
+}
+
+// ---- classificação ----
+const now = () => Date.now();
+const exp = r => r.lic_exp ? new Date(r.lic_exp).getTime() : null;
+const sub = r => r.revoked ? 'revoked' : !exp(r) ? 'none' : exp(r) > now() ? 'active' : 'expired';
+const daysLeft = r => Math.ceil((exp(r) - now()) / 86400000);
+const isOnline = r => now() - new Date(r.last_seen).getTime() < 150000;
+const ago = t => {
+  const s = Math.max(0, Math.floor((now() - new Date(t).getTime()) / 1000));
+  if (s < 10) return 'agora'; if (s < 60) return `há ${s} s`;
+  if (s < 3600) return `há ${Math.floor(s / 60)} min`; if (s < 86400) return `há ${Math.floor(s / 3600)} h`;
+  return `há ${Math.floor(s / 86400)} d`;
+};
+const dt = t => t ? new Date(t).toLocaleString('pt-BR') : '—';
+const actTxt = { idle: 'Parado', recording: 'Gravando', playing: 'Executando' };
+
+function badgeSub(r) {
+  const s = sub(r);
+  if (s === 'revoked') return '<span class="badge b-bad">Revogada</span>';
+  if (s === 'none') return '<span class="badge b-off">Sem licença</span>';
+  if (s === 'expired') return `<span class="badge b-bad">Expirada ${dt(r.lic_exp).split(',')[0]}</span>`;
+  const d = daysLeft(r);
+  return `<span class="badge ${d <= 7 ? 'b-warn' : 'b-ok'}">${d} dia(s)</span> <span class="sub">até ${dt(r.lic_exp).split(',')[0]}</span>`;
+}
+const pendBadge = r => r.liberacao_pendente ? ' <span class="badge b-warn" title="Liberação feita no painel; chega quando o cliente abrir a extensão">liberação enviada</span>' : '';
+const useBadge = r => r.em_uso ? `<span class="badge b-ok">${r.activity === 'recording' ? 'Gravando' : 'Executando'}</span>`
+  : r.nunca_usou ? '<span class="badge b-off">Nunca usou</span>'
+  : r.usou_7d ? '<span class="badge b-ok">Ativo</span>' : '<span class="badge b-warn">Parado há +7 dias</span>';
+const badgeRisk = r => r.risk === 'alto' ? '<span class="badge b-bad">Alto</span>' : r.risk === 'medio' ? '<span class="badge b-warn">Médio</span>' : '<span class="badge b-ok">OK</span>';
+
+const FILTERS = {
+  all: ['Todos', () => true],
+  online: ['Abertos agora', isOnline],
+  inuse: ['Em uso agora', r => r.em_uso],
+  used7: ['Usaram em 7 dias', r => r.usou_7d],
+  never: ['Nunca usaram', r => r.nunca_usou],
+  active: ['Assinaturas ativas', r => sub(r) === 'active'],
+  expiring: ['Vencem em 7 dias', r => sub(r) === 'active' && daysLeft(r) <= 7],
+  expired: ['Expiradas', r => sub(r) === 'expired'],
+  risk: ['Suspeitas', r => r.risk !== 'ok'],
+  revoked: ['Revogadas', r => r.revoked]
+};
+
+function render() {
+  const cnt = k => rows.filter(FILTERS[k][1]).length;
+  const card = (k, label) => `<div class="stat ${filter === k ? 'sel' : ''}" data-f="${k}"><b>${cnt(k)}</b><span>${label}</span></div>`;
+  $('cards').innerHTML = card('online', 'Abertos agora') + card('inuse', 'Em uso agora') + card('used7', 'Usaram nos últimos 7 dias') + card('active', 'Assinaturas ativas') + card('risk', 'Suspeitas de compartilhamento');
+  $('chips').innerHTML = Object.entries(FILTERS).map(([k, [l]]) => `<button class="chip ${filter === k ? 'sel' : ''}" data-f="${k}">${esc(l)} (${cnt(k)})</button>`).join('');
+  document.querySelectorAll('[data-f]').forEach(el => el.onclick = () => { filter = filter === el.dataset.f && el.classList.contains('stat') ? 'all' : el.dataset.f; render(); });
+
+  const q = query.trim().toLowerCase();
+  const list = rows.filter(FILTERS[filter][1]).filter(r => !q ||
+    [r.lic_name, r.id, r.note].some(v => String(v || '').toLowerCase().includes(q)));
+  $('empty').hidden = list.length > 0; $('empty').textContent = 'Nenhuma instalação encontrada.';
+  $('rows').innerHTML = list.map(r => `<tr data-id="${esc(r.id)}">
+    <td><i class="dot ${isOnline(r) ? 'on' : ''}"></i> ${isOnline(r) ? 'Aberto' : 'Fechado'}</td>
+    <td>${esc(r.lic_name || '—')}${r.note ? ` <span class="sub">· ${esc(r.note.slice(0, 30))}</span>` : ''}</td>
+    <td><code>${esc(r.id)}</code></td>
+    <td>${badgeSub(r)}${pendBadge(r)}</td>
+    <td>${useBadge(r)}${r.version ? ` <span class="sub">v${esc(r.version)}</span>` : ''}</td>
+    <td>${r.last_used ? esc(ago(r.last_used)) : '—'}</td>
+    <td>${esc(r.runs)}${r.recs ? ` <span class="sub">· ${esc(r.recs)} grav.</span>` : ''}</td>
+    <td>${badgeRisk(r)}</td>
+    <td>${esc(ago(r.last_seen))}</td></tr>`).join('');
+  document.querySelectorAll('#rows tr').forEach(tr => tr.onclick = () => showDetail(tr.dataset.id));
+}
+$('q').oninput = e => { query = e.target.value; render(); };
+setInterval(() => { if (!$('appView').hidden && rows.length) { render(); renderDash(); } }, 10000);   // "há X s" e online/offline
+
+// ---- detalhe ----
+async function showDetail(id, keepNote) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  openId = id;
+  const prevNote = keepNote && $('note') ? $('note').value : (r.note || '');
+  const prevDays = keepNote && $('gDays') ? $('gDays').value : '', prevName = keepNote && $('gName') ? $('gName').value : '';
+  if (id !== lastDetail) gMsgTxt = '';
+  lastDetail = id;
+  const { data: gr = [] } = await sb.from('install_grants').select('*').eq('install_id', id).order('created_at', { ascending: false }).limit(5);
+  $('dTitle').textContent = (r.lic_name || 'Sem nome') + ' · ' + r.id;
+  $('dBody').innerHTML = `
+    <div class="kv">
+      <div><span>Assinatura</span>${badgeSub(r)}</div>
+      <div><span>Emitida em</span>${esc(dt(r.lic_created))}</div>
+      <div><span>Expira em</span>${esc(dt(r.lic_exp))}</div>
+      <div><span>Primeiro sinal</span>${esc(dt(r.first_seen))}</div>
+      <div><span>Último sinal</span>${esc(dt(r.last_seen))} (${esc(ago(r.last_seen))})</div>
+      <div><span>Versão</span>${esc(r.version || '—')}</div>
+      <div><span>Uso</span>${useBadge(r)}</div>
+      <div><span>Último uso (gravar/executar)</span>${r.last_used ? esc(dt(r.last_used)) + ' (' + esc(ago(r.last_used)) + ')' : 'Nunca'}</div>
+      <div><span>Execuções · passos executados</span>${esc(r.runs)} · ${esc(r.steps_run)}</div>
+      <div><span>Gravações</span>${esc(r.recs)}</div>
+      <div><span>Risco de compartilhamento</span>${badgeRisk(r)} <span class="sub">${esc(r.clone_events)} divergência(s) de token${r.clone_last ? ' · última ' + esc(ago(r.clone_last)) : ''}</span></div>
+    </div>
+    <div><b>Liberar acesso</b>
+      <div class="sub" style="margin:2px 0 0">${r.liberacao_pendente
+        ? `<span class="badge b-warn">Liberação enviada</span> até ${esc(dt(r.grant_exp))}. Chega quando o cliente abrir a extensão (até ~1 min).`
+        : 'Soma ao tempo que ainda resta; se já venceu, conta a partir de agora. O cliente recebe sozinho ao abrir a extensão: não precisa enviar código.'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
+        ${GRANT_PLANS.map(([d, l]) => `<button data-grant="${d}" class="primary">${esc(l)}</button>`).join('')}
+        <input id="gDays" type="number" min="1" max="3650" placeholder="outro prazo (dias)" value="${esc(prevDays)}" style="width:150px">
+        <button id="gGo">Liberar</button>
+      </div>
+      ${r.lic_name ? '' : `<input id="gName" maxlength="80" placeholder="Nome do cliente (aparece na licença)" value="${esc(prevName)}" style="margin-top:6px">`}
+      <div class="sub" id="gMsg" style="margin-top:6px">${esc(gMsgTxt)}</div>
+      ${gr.length ? `<div class="sub" style="margin-top:4px">Últimas liberações: ${gr.map(g => `${esc(dt(g.created_at).split(',')[0])} +${esc(g.days)}d (até ${esc(dt(g.new_exp).split(',')[0])})`).join(' · ')}</div>` : ''}
+    </div>
+    <div><b>Anotação</b><textarea id="note" rows="2" placeholder="Ex.: cliente João, plano 6 meses, pago em 10/11">${esc(prevNote)}</textarea></div>`;
+  $('dFoot').innerHTML = `
+    <button id="bNote" class="primary">Salvar anotação</button>
+    <button id="bCopy">Copiar ID</button>
+    ${r.clone_events ? '<button id="bClr">Limpar alertas</button>' : ''}
+    ${r.revoked ? '<button id="bRest">Restaurar licença</button>' : '<button id="bRev" class="danger">Revogar licença</button>'}
+    <button id="bDel" class="danger" style="margin-left:auto">Excluir registro</button>`;
+  document.querySelectorAll('#dBody [data-grant]').forEach(b => b.onclick = () => doGrant(id, +b.dataset.grant));
+  $('gGo').onclick = () => doGrant(id, Number($('gDays').value));
+  $('bNote').onclick = async () => { await upd(id, { note: $('note').value.trim() || null }); };
+  $('bCopy').onclick = () => navigator.clipboard.writeText(id);
+  if (r.clone_events) $('bClr').onclick = () => upd(id, { clone_events: 0, clone_last: null });
+  if (r.revoked) $('bRest').onclick = () => upd(id, { revoked: false, revoked_at: null });
+  else $('bRev').onclick = () => { if (confirm('Revogar a licença? A extensão perde a ativação no próximo sinal (até ~1 min).')) upd(id, { revoked: true, revoked_at: new Date().toISOString() }); };
+  $('bDel').onclick = async () => {
+    if (!confirm('Excluir este registro e todo o histórico dele? Se a extensão continuar em uso, ele reaparece.')) return;
+    await sb.from('installs').delete().eq('id', id); $('dlg').close(); load();
+  };
+  if (!$('dlg').open) $('dlg').showModal();
+}
+// ---- liberar / renovar acesso pelo painel ----
+// Planos: mantenha iguais aos de plans.js da extensão (15 dias, 30 dias, 6 meses = 180 dias).
+const GRANT_PLANS = [[15, '+15 dias'], [30, '+30 dias'], [180, '+6 meses (180 dias)']];
+let lastDetail = null, gMsgTxt = '';
+const gMsg = t => { gMsgTxt = t; if ($('gMsg')) $('gMsg').textContent = t; };
+const newExpFor = (r, days) => Math.max(now(), exp(r) || 0, r.grant_exp ? new Date(r.grant_exp).getTime() : 0) + days * 86400000;
+async function doGrant(id, days) {
+  const r = rows.find(x => x.id === id); if (!r) return;
+  if (!Number.isInteger(days) || days < 1 || days > 3650) return gMsg('Informe um prazo entre 1 e 3650 dias.');
+  const name = ($('gName') && $('gName').value.trim()) || '';
+  const novo = new Date(newExpFor(r, days));
+  const msg = `Liberar ${r.lic_name || name || r.id} por +${days} dia(s)?\n\nNovo vencimento: ${novo.toLocaleString('pt-BR')}`
+    + (r.revoked ? '\n\nEsta licença está revogada: liberar também remove a revogação.' : '')
+    + (r.liberacao_pendente ? '\n\nJá existe uma liberação enviada que o cliente ainda não recebeu: este prazo será SOMADO a ela.' : '');
+  if (!confirm(msg)) return;
+  document.querySelectorAll('#dBody [data-grant], #gGo').forEach(b => b.disabled = true);
+  gMsg('Liberando…');
+  const { data, error } = await sb.functions.invoke('grant', { body: { id, days, name } });
+  let fail = error ? 'Não foi possível liberar.' : (data && data.ok ? '' : ((data && data.error) || 'Resposta inesperada.'));
+  if (error) { try { fail = (await error.context.json()).error || fail; } catch {} }
+  if (fail) { gMsg('❌ ' + fail); document.querySelectorAll('#dBody [data-grant], #gGo').forEach(b => b.disabled = false); return; }
+  gMsg(`✓ Liberado até ${new Date(data.exp).toLocaleString('pt-BR')}. O cliente recebe ao abrir a extensão (até ~1 min).`);
+  await load();
+}
+async function upd(id, patch) {
+  const { error } = await sb.from('installs').update(patch).eq('id', id);
+  if (error) return alert('Erro: ' + error.message);
+  await load();
+}
+$('dClose').onclick = () => { openId = null; $('dlg').close(); };
+$('dlg').addEventListener('close', () => { openId = null; });
+
+// ---- dashboard ----
+const pad2 = n => String(n).padStart(2, '0');
+const dkey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const fmtDay = d => `${d.slice(8)}/${d.slice(5, 7)}`;
+function lastDays(n) {
+  const out = [], t = new Date(); t.setHours(12, 0, 0, 0);
+  for (let i = n - 1; i >= 0; i--) { const d = new Date(t); d.setDate(t.getDate() - i); out.push(dkey(d)); }
+  return out;
+}
+function niceMax(v) {
+  if (v <= 4) return Math.max(v, 1);
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 2, 5, 10]) if (v <= m * p) return m * p;
+  return v;
+}
+function cols(days, layers) {
+  const W = 640, H = 190, L = 30, R = 6, T = 10, B = 24, iw = W - L - R, ih = H - T - B, n = days.length, bw = iw / n;
+  const max = niceMax(Math.max(1, ...layers.flatMap(l => l.vals)));
+  let g = '';
+  for (const f of [0, .5, 1]) {
+    if (!Number.isInteger(max * f)) continue;   // eixo só com números inteiros
+    const y = T + ih - ih * f;
+    g += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" class="grid"/><text x="${L - 5}" y="${y + 3.5}" class="ax" text-anchor="end">${Math.round(max * f)}</text>`;
+  }
+  for (const l of layers) l.vals.forEach((v, i) => {
+    const w = bw * l.w, x = L + i * bw + (bw - w) / 2, hh = ih * v / max;
+    g += `<rect x="${x.toFixed(1)}" y="${(T + ih - hh).toFixed(1)}" width="${w.toFixed(1)}" height="${(v ? Math.max(hh, 1.5) : 0).toFixed(1)}" rx="2" class="${l.cls}"><title>${fmtDay(days[i])}: ${v} ${esc(l.name)}</title></rect>`;
+  });
+  days.forEach((d, i) => { if (i % 5 === 0 || i === n - 1) g += `<text x="${(L + i * bw + bw / 2).toFixed(1)}" y="${H - 7}" class="ax" text-anchor="middle">${fmtDay(d)}</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+function tile(go, value, label, small) {
+  return `<div class="stat" data-go="${go}"><b>${esc(value)}</b><span>${esc(label)}</span>${small ? `<small>${esc(small)}</small>` : ''}</div>`;
+}
+function cliList(list, right) {
+  if (!list.length) return '<div class="sub" style="margin:8px 0">Nenhum cliente nesta situação.</div>';
+  return `<table class="mini">${list.map(r => `<tr data-open="${esc(r.id)}"><td>${esc(r.lic_name || '—')}<div class="sub"><code>${esc(r.id)}</code></div></td><td style="text-align:right">${right(r)}</td></tr>`).join('')}</table>`;
+}
+function renderDash() {
+  if (!$('dashView')) return;
+  const total = rows.length, N = t => now() - new Date(t).getTime();
+  const today = dkey(new Date()), dmap = Object.fromEntries(daily.map(x => [x.day, x])), td = dmap[today] || {};
+  const online = rows.filter(isOnline).length, inuse = rows.filter(r => r.em_uso).length;
+  const used7 = rows.filter(r => r.usou_7d).length, never = rows.filter(r => r.nunca_usou).length;
+  const active = rows.filter(r => sub(r) === 'active'), exp7 = active.filter(r => daysLeft(r) <= 7);
+  const expired = rows.filter(r => sub(r) === 'expired'), revoked = rows.filter(r => r.revoked);
+  const noLic = rows.filter(r => sub(r) === 'none'), susp = rows.filter(r => r.risk !== 'ok');
+  const new7 = rows.filter(r => N(r.first_seen) < 7 * 864e5).length;
+
+  $('kpis').innerHTML =
+    tile('online', online, 'Abertos agora', inuse + ' em uso agora') +
+    tile('used7', used7, 'Usaram em 7 dias', `${td.usaram || 0} hoje · ${td.abertos || 0} abriram hoje`) +
+    tile('active', active.length, 'Assinaturas ativas', exp7.length ? exp7.length + ' vencem em 7 dias' : 'nenhuma vence em 7 dias') +
+    tile('all', total, 'Instalações', new7 + ' novas em 7 dias') +
+    tile('never', never, 'Nunca usaram', 'abriram mas não gravaram/executaram') +
+    tile('risk', susp.length, 'Suspeitas', 'possível perfil copiado');
+
+  const days = lastDays(30);
+  const has = daily.some(x => days.includes(x.day));
+  $('chUse').innerHTML = has
+    ? cols(days, [{ vals: days.map(d => (dmap[d] || {}).abertos || 0), w: .8, cls: 'c-soft', name: 'abriram' }, { vals: days.map(d => (dmap[d] || {}).usaram || 0), w: .5, cls: 'c-pri', name: 'usaram' }])
+    : '<div class="empty">O histórico diário começa a ser gravado no primeiro sinal recebido depois da atualização.</div>';
+  const newBy = {}; rows.forEach(r => { const k = dkey(new Date(r.first_seen)); newBy[k] = (newBy[k] || 0) + 1; });
+  $('chNew').innerHTML = cols(days, [{ vals: days.map(d => newBy[d] || 0), w: .7, cls: 'c-ok', name: 'nova(s)' }]);
+
+  const seg = [
+    ['s-ok', 'Ativas (mais de 7 dias)', active.length - exp7.length], ['s-warn', 'Vencem em até 7 dias', exp7.length],
+    ['s-bad', 'Expiradas', expired.length], ['s-off', 'Sem licença', noLic.length], ['s-pri', 'Revogadas', revoked.length]
+  ];
+  $('subTot').textContent = `${total} instalação(ões) no total`;
+  $('chSubs').innerHTML = total
+    ? `<div class="stack">${seg.map(([c, l, n]) => n ? `<span class="${c}" style="width:${(100 * n / total).toFixed(2)}%" title="${esc(l)}: ${n}"></span>` : '').join('')}</div>
+       <div class="lg">${seg.map(([c, l, n]) => `<div><i class="${c}"></i>${esc(l)}<b>${n}</b></div>`).join('')}</div>`
+    : '<div class="empty">Nenhuma instalação ainda.</div>';
+
+  const vers = {}; rows.forEach(r => { const v = r.version || '—'; vers[v] = (vers[v] || 0) + 1; });
+  const vl = Object.entries(vers).sort((a, b) => b[1] - a[1]), vm = Math.max(1, ...vl.map(x => x[1]));
+  $('chVer').innerHTML = vl.length ? vl.map(([v, n]) => `<div class="vrow"><span>${esc(v === '—' ? v : 'v' + v)}</span><div><div class="vbar" style="width:${(100 * n / vm).toFixed(1)}%"></div></div><b>${n}</b></div>`).join('') : '<div class="empty">Sem dados.</div>';
+
+  $('lsExp').innerHTML = cliList(active.slice().sort((a, b) => exp(a) - exp(b)).slice(0, 8),
+    r => `<span class="badge ${daysLeft(r) <= 7 ? 'b-warn' : 'b-ok'}">${daysLeft(r)} dia(s)</span>`);
+  $('lsIdle').innerHTML = cliList(active.filter(r => !r.usou_7d).sort((a, b) => (a.last_used ? new Date(a.last_used) : 0) - (b.last_used ? new Date(b.last_used) : 0)).slice(0, 8),
+    r => r.last_used ? `<span class="sub">usou ${esc(ago(r.last_used))}</span>` : '<span class="badge b-off">nunca usou</span>');
+
+  document.querySelectorAll('[data-go]').forEach(el => el.onclick = () => { filter = el.dataset.go; setView('cli'); render(); });
+  document.querySelectorAll('[data-open]').forEach(el => el.onclick = () => showDetail(el.dataset.open));
+}
+let view = 'dash';
+function setView(v) {
+  view = v; $('dashView').hidden = v !== 'dash'; $('clientsView').hidden = v !== 'cli';
+  $('tDash').classList.toggle('sel', v === 'dash'); $('tCli').classList.toggle('sel', v === 'cli');
+}
+$('tDash').onclick = () => setView('dash'); $('tCli').onclick = () => setView('cli');
+
+boot();
+</script>
+</body>
+</html>
