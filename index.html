@@ -119,7 +119,14 @@
     </div>
     <div class="grid2">
       <div class="panel"><h3>Assinaturas</h3><p class="sub" id="subTot"></p><div id="chSubs"></div></div>
-      <div class="panel"><h3>Versões instaladas</h3><p class="sub">Quem ainda não atualizou.</p><div id="chVer"></div></div>
+      <div class="panel"><h3>Versões instaladas</h3><p class="sub">Quem ainda não atualizou.</p><div id="chVer"></div>
+        <div style="margin-top:12px;border-top:1px solid var(--bd);padding-top:10px">
+          <div class="sub" style="margin:0 0 6px">Avisar para atualizar quem estiver abaixo da versão:</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <input id="minV" placeholder="ex.: 1.6.2 (vazio = desligado)" inputmode="decimal" autocomplete="off" style="width:220px"><button id="minSave">Salvar</button>
+          </div>
+          <div class="sub" id="minMsg" style="margin-top:6px"></div>
+        </div></div>
     </div>
     <div class="grid2">
       <div class="panel"><h3>Vencem primeiro</h3><p class="sub">Próximas renovações.</p><div id="lsExp"></div></div>
@@ -129,6 +136,22 @@
 
   <div id="clientsView" hidden>
   <div class="cards" id="cards"></div>
+
+  <details id="newCli" class="panel" style="margin-bottom:12px">
+    <summary style="cursor:pointer"><b>＋ Liberar por ID (cliente novo)</b></summary>
+    <p class="sub">Cole o ID que o cliente mandou por e-mail, escolha o plano e pronto: o painel cadastra e libera. Quem usa a versão 1.6.2 ou mais nova recebe sozinho ao abrir a extensão.</p>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <input id="nId" placeholder="ID da instalação (XXXX-XXXX-XXXX-XXXX)" autocomplete="off" autocapitalize="characters" spellcheck="false" style="flex:2;min-width:230px">
+      <input id="nName" maxlength="80" placeholder="Nome do cliente" style="flex:1;min-width:150px">
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center" id="nBtns"></div>
+    <div class="sub" id="nMsg" style="margin-top:6px"></div>
+    <div id="nCode" hidden style="margin-top:8px">
+      <div class="sub">Código de ativação — só precisa enviar se o cliente usa uma versão antiga da extensão (que não recebe sozinha):</div>
+      <textarea id="nCodeTxt" rows="3" readonly style="font:12px monospace;word-break:break-all"></textarea>
+      <button id="nCopy" style="margin-top:6px">Copiar código</button>
+    </div>
+  </details>
 
   <div class="bar">
     <input id="q" placeholder="Buscar por nome, ID ou anotação…">
@@ -205,7 +228,9 @@ async function load() {
   const since = new Date(Date.now() - 60 * 864e5);
   const dres = await sb.from('daily_stats').select('*').gte('day', dkey(since)).order('day');
   daily = dres.error ? [] : (dres.data || []);
-  render(); renderDash();
+  const mres = await sb.from('app_config').select('value').eq('key', 'min_version').maybeSingle();
+  if (!mres.error) { minSaved = (mres.data && mres.data.value) || ''; if (!minDirty && $('minV')) $('minV').value = minSaved; }
+  render(); renderDash(); minInfo();
   if (openId && $('dlg').open) showDetail(openId, true);
 }
 
@@ -312,6 +337,7 @@ async function showDetail(id, keepNote) {
       </div>
       ${r.lic_name ? '' : `<input id="gName" maxlength="80" placeholder="Nome do cliente (aparece na licença)" value="${esc(prevName)}" style="margin-top:6px">`}
       <div class="sub" id="gMsg" style="margin-top:6px">${esc(gMsgTxt)}</div>
+      ${r.grant_code ? `<div style="margin-top:6px"><button id="gCopy">Copiar código de ativação</button> <span class="sub">só para quem usa versão antiga da extensão</span></div>` : ''}
       ${gr.length ? `<div class="sub" style="margin-top:4px">Últimas liberações: ${gr.map(g => `${esc(dt(g.created_at).split(',')[0])} +${esc(g.days)}d (até ${esc(dt(g.new_exp).split(',')[0])})`).join(' · ')}</div>` : ''}
     </div>
     <div><b>Anotação</b><textarea id="note" rows="2" placeholder="Ex.: cliente João, plano 6 meses, pago em 10/11">${esc(prevNote)}</textarea></div>`;
@@ -323,6 +349,7 @@ async function showDetail(id, keepNote) {
     <button id="bDel" class="danger" style="margin-left:auto">Excluir registro</button>`;
   document.querySelectorAll('#dBody [data-grant]').forEach(b => b.onclick = () => doGrant(id, +b.dataset.grant));
   $('gGo').onclick = () => doGrant(id, Number($('gDays').value));
+  if (r.grant_code) $('gCopy').onclick = () => navigator.clipboard.writeText(r.grant_code).then(() => gMsg('Código copiado. Cole no e-mail ou no WhatsApp do cliente.'));
   $('bNote').onclick = async () => { await upd(id, { note: $('note').value.trim() || null }); };
   $('bCopy').onclick = () => navigator.clipboard.writeText(id);
   if (r.clone_events) $('bClr').onclick = () => upd(id, { clone_events: 0, clone_last: null });
@@ -351,9 +378,7 @@ async function doGrant(id, days) {
   if (!confirm(msg)) return;
   document.querySelectorAll('#dBody [data-grant], #gGo').forEach(b => b.disabled = true);
   gMsg('Liberando…');
-  const { data, error } = await sb.functions.invoke('grant', { body: { id, days, name } });
-  let fail = error ? 'Não foi possível liberar.' : (data && data.ok ? '' : ((data && data.error) || 'Resposta inesperada.'));
-  if (error) { try { fail = (await error.context.json()).error || fail; } catch {} }
+  const { data, fail } = await callGrant({ id, days, name });
   if (fail) { gMsg('❌ ' + fail); document.querySelectorAll('#dBody [data-grant], #gGo').forEach(b => b.disabled = false); return; }
   gMsg(`✓ Liberado até ${new Date(data.exp).toLocaleString('pt-BR')}. O cliente recebe ao abrir a extensão (até ~1 min).`);
   await load();
@@ -453,6 +478,61 @@ function renderDash() {
   document.querySelectorAll('[data-go]').forEach(el => el.onclick = () => { filter = el.dataset.go; setView('cli'); render(); });
   document.querySelectorAll('[data-open]').forEach(el => el.onclick = () => showDetail(el.dataset.open));
 }
+// ---- liberar por ID (cliente novo) ----
+async function callGrant(body) {
+  const { data, error } = await sb.functions.invoke('grant', { body });
+  let fail = error ? 'Não foi possível liberar.' : (data && data.ok ? '' : ((data && data.error) || 'Resposta inesperada.'));
+  if (error) { try { fail = (await error.context.json()).error || fail; } catch {} }
+  return { data, fail };
+}
+const fmtId = s => (String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').match(/.{1,4}/g) || []).join('-');
+const idOk = s => /^[A-HJ-NP-Z2-9]{16}$/.test(String(s).replace(/-/g, ''));   // alfabeto que a extensão usa: sem I, O, 0, 1
+const nMsg = t => { $('nMsg').textContent = t; };
+async function newGrant(days) {
+  const id = fmtId($('nId').value), name = $('nName').value.trim();
+  $('nId').value = id;
+  if (!idOk(id)) return nMsg('ID inválido: são 4 grupos de 4 caracteres, só letras A–Z e números 2–9 (não existem I, O, 0 nem 1). Confira com o cliente.');
+  if (!Number.isInteger(days) || days < 1 || days > 3650) return nMsg('Informe um prazo entre 1 e 3650 dias.');
+  const r = rows.find(x => x.id === id);
+  const novo = new Date(r ? newExpFor(r, days) : now() + days * 864e5);
+  const msg = `${r ? 'Renovar' : 'Cadastrar e liberar'} ${r?.lic_name || name || id} por +${days} dia(s)?\n\nID: ${id}\nNovo vencimento: ${novo.toLocaleString('pt-BR')}`
+    + (r ? '\n\nEste ID já está na lista: o prazo será somado ao que ele já tem.' : '');
+  if (!confirm(msg)) return;
+  const btns = document.querySelectorAll('#nBtns button'); btns.forEach(b => b.disabled = true);
+  nMsg('Liberando…'); $('nCode').hidden = true;
+  const { data, fail } = await callGrant({ id, days, name, create: true });
+  btns.forEach(b => b.disabled = false);
+  if (fail) return nMsg('❌ ' + fail);
+  nMsg(`✓ ${data.name || id} liberado até ${new Date(data.exp).toLocaleString('pt-BR')}. Quem usa a versão 1.6.2+ recebe ao abrir a extensão (até ~1 min).`);
+  $('nCodeTxt').value = data.code || ''; $('nCode').hidden = !data.code;
+  $('nId').value = ''; $('nName').value = '';
+  await load();
+}
+$('nBtns').innerHTML = GRANT_PLANS.map(([d, l]) => `<button data-n="${d}" class="primary">${esc(l)}</button>`).join('')
+  + `<input id="nDays" type="number" min="1" max="3650" placeholder="outro prazo (dias)" style="width:150px"><button id="nGo">Liberar</button>`;
+document.querySelectorAll('#nBtns [data-n]').forEach(b => b.onclick = () => newGrant(+b.dataset.n));
+$('nGo').onclick = () => newGrant(Number($('nDays').value));
+$('nId').onblur = () => { $('nId').value = fmtId($('nId').value); };
+$('nCopy').onclick = () => navigator.clipboard.writeText($('nCodeTxt').value).then(() => nMsg('Código copiado.'));
+
+// ---- aviso de atualização (versão mínima) ----
+let minSaved = '', minDirty = false;
+const verLt = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { const p = x[i] || 0, q = y[i] || 0; if (p !== q) return p < q; } return false; };
+function minInfo() {
+  if (!$('minMsg') || minDirty) return;
+  if (!minSaved) { $('minMsg').textContent = 'Desligado. Quando ligar, a extensão só mostra um aviso para atualizar; nunca bloqueia.'; return; }
+  const n = rows.filter(r => r.version && verLt(r.version, minSaved)).length;
+  $('minMsg').textContent = `Ligado em ${minSaved}: ${n} instalação(ões) abaixo. O aviso só aparece em quem já tem a versão 1.6.2 ou mais nova; versões anteriores precisam ser avisadas por você.`;
+}
+$('minV').oninput = () => { minDirty = true; };
+$('minSave').onclick = async () => {
+  const v = $('minV').value.trim();
+  if (v && !/^\d+(\.\d+){0,3}$/.test(v)) { minDirty = true; return ($('minMsg').textContent = 'Use só números e pontos, por exemplo 1.6.2.'); }
+  const { error } = await sb.from('app_config').upsert({ key: 'min_version', value: v });
+  if (error) return ($('minMsg').textContent = '❌ Não foi possível salvar: ' + error.message);
+  minSaved = v; minDirty = false; minInfo();
+};
 let view = 'dash';
 function setView(v) {
   view = v; $('dashView').hidden = v !== 'dash'; $('clientsView').hidden = v !== 'cli';
